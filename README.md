@@ -1,8 +1,9 @@
 # SeminarLiteRT
 Vertiefungsseminar zum Thema LiteRt
 
+Testweise :Beispiel Anw von Google zum laufen bringen 
 App 1 
-Beispiel Anw von Google zum laufen bringen 
+LiteRT Modell in eigener App einbinden-> selbes wie im Test. Classifier selbst erstellt
 
 App 2
 Fertiges (einfaches) Modell in LiteRT Model umwandeln und zum laufen bringen

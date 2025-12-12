@@ -1,24 +1,23 @@
 package com.example.seminarlitert;
 
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.util.Log;
+
+
 import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.InterpreterApi;
 import org.tensorflow.lite.InterpreterApi.Options.TfLiteRuntime;
 import org.tensorflow.lite.support.common.FileUtil;
-import org.tensorflow.lite.support.metadata.MetadataExtractor;
-import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
+import org.tensorflow.lite.support.image.ImageProcessor;
+import org.tensorflow.lite.support.image.TensorImage;
+import org.tensorflow.lite.support.image.ops.Rot90Op;
 
-
-import android.content.Context;
-import android.graphics.Bitmap;
-
-import com.google.android.gms.tasks.Task;
-
-import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -28,12 +27,13 @@ public class Classifier {
     private List<String> labels;
     //vom Modell abhängig
     private int imageSize;
-
+    private Bitmap selectedBitmap;
     private MappedByteBuffer modelBuffer;
 
     //wenn kein Label enthalten -> ziehe aus Modell Metadaten
     // auch möglich: prüfe, ob metadaten labels enthalten. Wenn ja, nutze es wenn nein frage ab und lies File von User ein
-    public Classifier(Context context, String modelFile, int imageSize) {
+
+   /* public Classifier(Context context, String modelFile, int imageSize) {
         initInterpreter(context, modelFile);
         this.imageSize = imageSize;
 
@@ -43,7 +43,7 @@ public class Classifier {
             throw new RuntimeException("Keine embedded labels gefunden!", e);
         }
     }
-
+*/
 
     // wenn Labels übergeben, nutze File (bei eigenen Modellen);
     public Classifier(Context context, String modelFile, String labelsFile, int imageSize) {
@@ -59,9 +59,9 @@ public class Classifier {
 
     private void initInterpreter(Context context, String modelFile) {
         try {
-            modelBuffer = FileUtil.loadMappedFile(context, modelFile);
+            this.modelBuffer = FileUtil.loadMappedFile(context, modelFile);
 
-            interpreter = InterpreterApi.create(
+            this.interpreter = InterpreterApi.create(
                     modelBuffer,
                     new InterpreterApi.Options().setRuntime(TfLiteRuntime.FROM_SYSTEM_ONLY)
             );
@@ -70,7 +70,8 @@ public class Classifier {
         }
     }
 
-    //labels im Modell
+    //labels im Modell-> über google play services nicht möglich
+    /*
     private List<String> loadEmbeddedLabels(MappedByteBuffer modelBuffer) throws IOException {
 
         MetadataExtractor extractor = new MetadataExtractor(modelBuffer);
@@ -86,7 +87,7 @@ public class Classifier {
         }
 
         return result;
-    }
+    }*/
 
     public void classify(Bitmap bitmap, Consumer<String> callback) {
 
@@ -94,44 +95,44 @@ public class Classifier {
             callback.accept("Interpreter nicht initialisiert");
             return;
         }
-
+        // Bild auf Modellgröße skalieren
         Bitmap scaled = Bitmap.createScaledBitmap(bitmap, imageSize, imageSize, true);
-
-        TensorBuffer inputBuffer = TensorBuffer.createFixedSize(
-                new int[]{1, imageSize, imageSize, 3}, DataType.FLOAT32
-        );
-
-        float[] inputData = new float[imageSize * imageSize * 3];
-        int idx = 0;
-
-        for (int y = 0; y < imageSize; y++) {
-            for (int x = 0; x < imageSize; x++) {
-
-                int pixel = scaled.getPixel(x, y);
-
-                inputData[idx++] = ((pixel >> 16) & 0xFF) / 255f;
-                inputData[idx++] = ((pixel >> 8) & 0xFF) / 255f;
-                inputData[idx++] = (pixel & 0xFF) / 255f;
-            }
-        }
-
-        inputBuffer.loadArray(inputData);
-
-        TensorBuffer outputBuffer = TensorBuffer.createFixedSize(
-                new int[]{1, labels.size()}, DataType.FLOAT32
-        );
+        ByteBuffer byteBufferConvertTest = convertBitmapToByteArray(scaled);
 
 
-        //Task<Void> task;
-        //task = interpreter.run(inputBuffer, outputBuffer);
-        //synchrone lösung mit interpreter api -> bei laufender UI sollte je nachdem async sein
+
+
+        TensorImage MyTensorImage = new TensorImage((DataType.UINT8));
+        MyTensorImage.load(scaled);
+
+        ByteBuffer mybytebuffer = MyTensorImage.getBuffer();
+
+
+
+
+
+
+
+        // --- Output ByteBuffer erstellen ---
+        ByteBuffer outputByteBuffer = ByteBuffer.allocateDirect(labels.size()); // float pro Label
+        outputByteBuffer.order(ByteOrder.nativeOrder());
+
         try {
-            //Inferenz
-            interpreter.run(inputBuffer, outputBuffer);
+            // Inferenz ausführen
+            interpreter.run(mybytebuffer, outputByteBuffer);
+            outputByteBuffer.rewind();
 
-            float[] probs = outputBuffer.getFloatArray();
 
-            // Top-1 Label berechnen
+
+            byte[] rawOutput = new byte[labels.size()];
+            outputByteBuffer.get(rawOutput);
+
+            float[] probs = new float[labels.size()];
+            for (int i = 0; i < rawOutput.length; i++) {
+                probs[i] = (rawOutput[i] & 0xFF) / 255.0f;
+            }
+
+            // Top-1 Label bestimmen
             int maxIndex = 0;
             float maxProb = 0;
             for (int i = 0; i < probs.length; i++) {
@@ -141,6 +142,8 @@ public class Classifier {
                 }
             }
 
+
+            // Ergebnis zurückgeben
             callback.accept(labels.get(maxIndex) + String.format(" (%.2f%%)", maxProb * 100));
 
         } catch (Exception e) {
@@ -148,4 +151,10 @@ public class Classifier {
         }
     }
 
+    public static ByteBuffer convertBitmapToByteArray(Bitmap bitmap){
+        ByteBuffer byteBuffer = ByteBuffer.allocate(bitmap.getByteCount());
+        bitmap.copyPixelsToBuffer(byteBuffer);
+        byteBuffer.rewind();
+        return byteBuffer;
+    }
 }

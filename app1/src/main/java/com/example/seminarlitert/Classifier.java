@@ -177,10 +177,5 @@ public class Classifier {
         }
     }
 
-    public static ByteBuffer convertBitmapToByteArray(Bitmap bitmap){
-        ByteBuffer byteBuffer = ByteBuffer.allocate(bitmap.getByteCount());
-        bitmap.copyPixelsToBuffer(byteBuffer);
-        byteBuffer.rewind();
-        return byteBuffer;
-    }
+
 }

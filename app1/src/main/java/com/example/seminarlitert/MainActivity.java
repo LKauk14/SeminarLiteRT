@@ -13,18 +13,10 @@ import android.widget.TextView;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 
 
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tflite.java.TfLite;
-
-import org.tensorflow.lite.InterpreterApi;
-import org.tensorflow.lite.InterpreterApi.Options.TfLiteRuntime;
 
 import org.tensorflow.lite.InterpreterApi;
 

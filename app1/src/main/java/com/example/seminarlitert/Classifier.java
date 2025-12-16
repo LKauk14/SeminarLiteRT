@@ -91,26 +91,52 @@ public class Classifier {
 
     public void classify(Bitmap bitmap, Consumer<String> callback) {
 
+
         if (interpreter == null) {
             callback.accept("Interpreter nicht initialisiert");
             return;
         }
+
+
+        int[] shape = interpreter.getInputTensor(0).shape();
+        int batch = shape[0];
+        int INPUT_HEIGHT = shape[1];
+        int INPUT_WIDTH = shape[2];
+        int channels = shape[3];
+
         // Bild auf Modellgröße skalieren
-        Bitmap scaled = Bitmap.createScaledBitmap(bitmap, imageSize, imageSize, true);
-        ByteBuffer byteBufferConvertTest = convertBitmapToByteArray(scaled);
+        Bitmap scaled = Bitmap.createScaledBitmap(bitmap, INPUT_HEIGHT, INPUT_WIDTH, true);
+        ByteBuffer byteBufferConvertTest = ByteBuffer.allocateDirect(1*INPUT_HEIGHT*INPUT_WIDTH*3);
+        byteBufferConvertTest.order(ByteOrder.nativeOrder());
 
 
+        int[] pixels = new int[INPUT_WIDTH * INPUT_HEIGHT];
+        scaled.getPixels(
+                pixels,
+                0,
+                INPUT_WIDTH,
+                0,
+                0,
+                INPUT_WIDTH,
+                INPUT_HEIGHT
+        );
 
+        int pixelIndex = 0;
+        for (int y = 0; y < INPUT_HEIGHT; y++) {
+            for (int x = 0; x < INPUT_WIDTH; x++) {
+                int pixel = pixels[pixelIndex++];
 
-        TensorImage MyTensorImage = new TensorImage((DataType.UINT8));
-        MyTensorImage.load(scaled);
+                // RGB extrahieren (0–255)
+                byte r = (byte) ((pixel >> 16) & 0xFF);
+                byte g = (byte) ((pixel >> 8) & 0xFF);
+                byte b = (byte) (pixel & 0xFF);
+                byteBufferConvertTest.put(r);
+                byteBufferConvertTest.put(g);
+                byteBufferConvertTest.put(b);
+            }
+        }
 
-        ByteBuffer mybytebuffer = MyTensorImage.getBuffer();
-
-
-
-
-
+        byteBufferConvertTest.rewind();
 
 
         // --- Output ByteBuffer erstellen ---
@@ -119,7 +145,7 @@ public class Classifier {
 
         try {
             // Inferenz ausführen
-            interpreter.run(mybytebuffer, outputByteBuffer);
+            interpreter.run(byteBufferConvertTest, outputByteBuffer);
             outputByteBuffer.rewind();
 
 

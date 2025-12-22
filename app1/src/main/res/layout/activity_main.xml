@@ -9,29 +9,32 @@
     tools:context=".MainActivity">
 
     <!-- IMAGE VIEW oben -->
+
+    <!-- TEXT VIEW darunter -->
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:layout_marginBottom="149dp"
         android:scaleType="fitCenter"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@+id/textViewResult"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toTopOf="@+id/switchMethod"
         app:layout_constraintEnd_toEndOf="parent"
-        app:srcCompat="@android:drawable/ic_menu_camera"/>
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:srcCompat="@android:drawable/ic_menu_camera" />
 
-    <!-- TEXT VIEW darunter -->
     <TextView
         android:id="@+id/textViewResult"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:padding="8dp"
         android:text="Ergebnis erscheint hier"
         android:textAlignment="center"
-        android:padding="8dp"
-        app:layout_constraintTop_toBottomOf="@id/imageView"
         app:layout_constraintBottom_toTopOf="@id/buttonUpload"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintTop_toBottomOf="@+id/switchMethod" />
 
     <!-- BUTTONS AM UNTEREN RAND -->
 
@@ -55,5 +58,14 @@
         app:layout_constraintStart_toEndOf="@id/buttonUpload"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"/>
+
+    <Switch
+        android:id="@+id/switchMethod"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Use Tensor Method"
+        app:layout_constraintBottom_toTopOf="@+id/textViewResult"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/imageView" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

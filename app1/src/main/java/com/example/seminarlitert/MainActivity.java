@@ -7,6 +7,7 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.Switch;
 import android.widget.TextView;
 
 
@@ -26,16 +27,23 @@ import java.io.IOException;
 public class MainActivity extends AppCompatActivity {
 
     //Modellabhängig
+    enum ClassifyMode {
+        NORMAL,
+        TENSOR_IMAGE
+    }
+
     private static final int IMAGE_PICK_CODE = 1001;
     private static final int IMAGE_SIZE = 224;
     private InterpreterApi interpreter;
     private Classifier classifier;
-
+    ClassifyMode mode = ClassifyMode.NORMAL;
     private Button buttonClassify;
     private Button buttonUpload;
     private ImageView imageView;
     private TextView textViewResult;
     private Bitmap selectedBitmap;
+
+    private Switch switchMethod;
 
     private final ActivityResultLauncher<String> galleryLauncher =
             registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
@@ -51,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
 
-
+        switchMethod = findViewById(R.id.switchMethod);
         imageView = findViewById(R.id.imageView);
         buttonUpload = findViewById(R.id.buttonUpload);
         buttonClassify = findViewById(R.id.buttonClassify);
@@ -59,30 +67,40 @@ public class MainActivity extends AppCompatActivity {
 
         Task<Void> initializeTask = TfLite.initialize(this);
         initializeTask.addOnSuccessListener(a -> {
-                    classifier = new Classifier(this, "mobilenetv1.tflite","labels.txt", IMAGE_SIZE);
+                    classifier = new Classifier(this, "mobilenetv1.tflite", "labels.txt", IMAGE_SIZE);
                 })
                 .addOnFailureListener(e -> {
                     Log.e("Interpreter", String.format("Cannot initialize interpreter: %s",
                             e.getMessage()));
                 });
 
-
         buttonUpload.setOnClickListener(v -> pickImageFromGallery());
         buttonClassify.setOnClickListener(v -> {
+
             if (selectedBitmap == null) {
                 textViewResult.setText("Bitte zuerst ein Bild auswählen!");
                 return;
             }
+            mode = switchMethod.isChecked() ? ClassifyMode.TENSOR_IMAGE : ClassifyMode.NORMAL;
 
-            // Klassifizierung starten
-            classifier.classify(selectedBitmap, result -> runOnUiThread(() -> {
-                textViewResult.setText("Ergebnis: " + result);
-            }));
+            switch (mode) {
+                case NORMAL:
+                    classifier.classify(selectedBitmap, result -> runOnUiThread(() -> {
+                        textViewResult.setText("Ergebnis: " + result);
+                    }));
+                    break;
+                case TENSOR_IMAGE:
+                    classifier.classifyWithTensorImage(selectedBitmap, result -> runOnUiThread(() -> {
+                        textViewResult.setText("Ergebnis: " + result);
+                    }));
+                    break;
+
+            }
         });
     }
 
-    private void pickImageFromGallery() {
 
+    private void pickImageFromGallery() {
         galleryLauncher.launch("image/*");
     }
 

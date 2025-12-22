@@ -5,13 +5,17 @@ import android.graphics.Bitmap;
 import android.util.Log;
 
 
+import com.google.android.gms.tasks.Task;
+
 import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.InterpreterApi;
 import org.tensorflow.lite.InterpreterApi.Options.TfLiteRuntime;
 import org.tensorflow.lite.support.common.FileUtil;
 import org.tensorflow.lite.support.image.ImageProcessor;
 import org.tensorflow.lite.support.image.TensorImage;
+import org.tensorflow.lite.support.image.ops.ResizeOp;
 import org.tensorflow.lite.support.image.ops.Rot90Op;
+import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -70,33 +74,12 @@ public class Classifier {
         }
     }
 
-    //labels im Modell-> über google play services nicht möglich
-    /*
-    private List<String> loadEmbeddedLabels(MappedByteBuffer modelBuffer) throws IOException {
-
-        MetadataExtractor extractor = new MetadataExtractor(modelBuffer);
-
-        InputStream labelsInput = extractor.getAssociatedFile("labels.txt");
-
-        List<String> result = new ArrayList<>();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(labelsInput));
-
-        String line;
-        while ((line = reader.readLine()) != null) {
-            result.add(line);
-        }
-
-        return result;
-    }*/
-
     public void classify(Bitmap bitmap, Consumer<String> callback) {
-
 
         if (interpreter == null) {
             callback.accept("Interpreter nicht initialisiert");
             return;
         }
-
 
         int[] shape = interpreter.getInputTensor(0).shape();
         int batch = shape[0];
@@ -108,7 +91,6 @@ public class Classifier {
         Bitmap scaled = Bitmap.createScaledBitmap(bitmap, INPUT_HEIGHT, INPUT_WIDTH, true);
         ByteBuffer byteBufferConvertTest = ByteBuffer.allocateDirect(1*INPUT_HEIGHT*INPUT_WIDTH*3);
         byteBufferConvertTest.order(ByteOrder.nativeOrder());
-
 
         int[] pixels = new int[INPUT_WIDTH * INPUT_HEIGHT];
         scaled.getPixels(
@@ -138,7 +120,6 @@ public class Classifier {
 
         byteBufferConvertTest.rewind();
 
-
         // --- Output ByteBuffer erstellen ---
         ByteBuffer outputByteBuffer = ByteBuffer.allocateDirect(labels.size()); // float pro Label
         outputByteBuffer.order(ByteOrder.nativeOrder());
@@ -147,8 +128,6 @@ public class Classifier {
             // Inferenz ausführen
             interpreter.run(byteBufferConvertTest, outputByteBuffer);
             outputByteBuffer.rewind();
-
-
 
             byte[] rawOutput = new byte[labels.size()];
             outputByteBuffer.get(rawOutput);
@@ -177,5 +156,51 @@ public class Classifier {
         }
     }
 
+    public void classifyWithTensorImage(Bitmap bitmap, Consumer<String> callback) {
 
+        if (interpreter == null) {
+            callback.accept("Interpreter nicht initialisiert");
+            return;
+        }
+
+        // Bild auf Modellgröße skalieren
+        Bitmap scaled = Bitmap.createScaledBitmap(bitmap, imageSize, imageSize, true);
+        ImageProcessor imageProcessor =
+                new ImageProcessor.Builder().add(new ResizeOp(imageSize, imageSize, ResizeOp.ResizeMethod.BILINEAR)).build();
+
+        TensorImage tensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap));
+        ByteBuffer inputBuffer = tensorImage.getBuffer();
+
+        // --- Output ByteBuffer erstellen ---
+        ByteBuffer outputByteBuffer = ByteBuffer.allocateDirect(labels.size()); // float pro Label
+        outputByteBuffer.order(ByteOrder.nativeOrder());
+
+        try {
+            // Inferenz ausführen
+            interpreter.run(inputBuffer, outputByteBuffer);
+            outputByteBuffer.rewind();
+
+            float[] probs = new float[labels.size()];
+
+            for (int i = 0; i < probs.length; i++) {
+                probs[i] = (outputByteBuffer.get() & 0xFF) / 255f;
+            }
+
+            // Top-1 Label bestimmen
+            int maxIndex = 0;
+            float maxProb = 0;
+            for (int i = 0; i < probs.length; i++) {
+                if (probs[i] > maxProb) {
+                    maxProb = probs[i];
+                    maxIndex = i;
+                }
+            }
+
+            // Ergebnis zurückgeben
+            callback.accept(labels.get(maxIndex) + String.format(" (%.2f%%)", maxProb * 100));
+
+        } catch (Exception e) {
+            callback.accept("Fehler bei Inference: " + e.getMessage());
+        }
+    }
 }

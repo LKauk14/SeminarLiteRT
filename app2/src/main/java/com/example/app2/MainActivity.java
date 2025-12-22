@@ -1,60 +1,104 @@
-package com.example.app2;
+package com.example.seminarlitert;
+
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Log;
-import androidx.annotation.Nullable;
+import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
 
+import com.example.app2.MyAudioClassifier;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tflite.java.TfLite;
 
 import org.tensorflow.lite.InterpreterApi;
 
+import org.tensorflow.lite.support.audio.*;
+
 import java.io.IOException;
-import java.nio.MappedByteBuffer;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String TAG = "TFLitePlayServices";
+    //Modellabhängig
+    private static final int IMAGE_PICK_CODE = 1001;
+    private static final int IMAGE_SIZE = 224;
+    private InterpreterApi interpreter;
+    private MyAudioClassifier classifier;
+
+
+    private Button buttonClassify;
+    private Button buttonUpload;
+    private ImageView imageView;
+    private TextView textViewResult;
+    private Bitmap selectedBitmap;
+
+
+
+    private final ActivityResultLauncher<String> galleryLauncher =
+            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
+                if (uri != null) {
+                    loadImage(uri);
+                }
+            });
 
     @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
 
-        // 1️⃣ Initialize TFLite asynchronously
-        TfLite.initialize(this)
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void unused) {
-                        Log.d(TAG, "Play Services TFLite initialized!");
-                        try {
-                            runModel();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
+
+        setContentView(R.layout.layout.activity_main);
+
+
+        imageView = findViewById(R.id.imageView);
+        buttonUpload = findViewById(R.id.buttonUpload);
+        buttonClassify = findViewById(R.id.buttonClassify);
+        textViewResult = findViewById(R.id.textViewResult);
+
+        Task<Void> initializeTask = TfLite.initialize(this);
+        initializeTask.addOnSuccessListener(a -> {
+                    classifier = new MyAudioClassifier((this, "soundclassifier_with_metadata.tflite","labels.txt" );
                 })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(Exception e) {
-                        Log.e(TAG, "TFLite initialization failed", e);
-                    }
+                .addOnFailureListener(e -> {
+                    Log.e("Interpreter", String.format("Cannot initialize interpreter: %s",
+                            e.getMessage()));
                 });
+
+
+        buttonUpload.setOnClickListener(v -> pickImageFromGallery());
+        buttonClassify.setOnClickListener(v -> {
+            if (selectedBitmap == null) {
+                textViewResult.setText("Bitte zuerst ein Bild auswählen!");
+                return;
+            }
+
+            // Klassifizierung starten
+            classifier.classify(selectedBitmap, result -> runOnUiThread(() -> {
+                textViewResult.setText("Ergebnis: " + result);
+            }));
+        });
     }
 
-    private void runModel() throws IOException {
-        // 2️⃣ Load model from assets
-        MappedByteBuffer modelBuffer = InterpreterApi.loadModelFromAsset(this, "model.tflite");
+    private void pickImageFromGallery() {
 
-        // 3️⃣ Create Interpreter
-        InterpreterApi interpreter = InterpreterApi.create(modelBuffer);
+        galleryLauncher.launch("image/*");
+    }
 
-        // 4️⃣ Prepare input & output (example: single float input, single float output)
-        float[] input = new float[]{1.0f};
-        float[] output = new float[1];
+    private void loadImage(Uri uri) {
+        try {
+            selectedBitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), uri);
+            imageView.setImageBitmap(selectedBitmap);
 
-        // 5️⃣ Run inference
-        interpreter.run(input, output);
-
-        Log.d(TAG, "Model output: " + output[0]);
+        } catch (IOException e) {
+            e.printStackTrace();
+            textViewResult.setText("Fehler beim Laden des Bildes!");
+        }
     }
 }

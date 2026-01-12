@@ -57,7 +57,6 @@ public class MainActivity extends AppCompatActivity {
         textViewResult = findViewById(R.id.textViewResult);
 
 
-
         // Classifier initialisieren
         try {
             classifier = new Classifier(this, "mobilenetv1.tflite", "labels1.txt", IMAGE_SIZE);
@@ -95,18 +94,4 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private List<String> loadLabels(String fileName) {
-        List<String> result = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(getAssets().open(fileName)))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                result.add(line);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-            textViewResult.setText("Fehler beim Laden der Labels!");
-        }
-        return result;
-    }
 }

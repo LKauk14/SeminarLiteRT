@@ -38,14 +38,12 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
-    implementation(libs.litert.api)
+    implementation(libs.litert.support.api)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    implementation(libs.litert)
 
-// Play Services TFLite core API
-    implementation("com.google.android.gms:play-services-tflite-java:16.3.0")
-// Optional support helper library
-    implementation("com.google.android.gms:play-services-tflite-support:16.3.0")
 
 }

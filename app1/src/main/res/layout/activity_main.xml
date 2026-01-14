@@ -43,7 +43,7 @@
         android:id="@+id/buttonUpload"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Upload Bild"
+        android:text="Upload Img"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@id/buttonClassify"
         app:layout_constraintBottom_toBottomOf="parent"

@@ -6,7 +6,6 @@ import android.widget.Toast;
 
 import com.google.ai.edge.litert.Accelerator;
 import com.google.ai.edge.litert.CompiledModel;
-import com.google.ai.edge.litert.Environment;
 import com.google.ai.edge.litert.LiteRtException;
 import com.google.ai.edge.litert.*;
 
@@ -14,49 +13,77 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-import java.nio.MappedByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+    /**
+     * @class Classifier
+     * @brief Bildklassifikator auf Basis von LiteRT (TensorFlow Lite Runtime) mit Compiled Model API.
+     * <p>
+     * Diese Klasse kapselt:
+     * - Laden eines LiteRT-Modells aus den Assets
+     * - Wahl des Accelerators (CPU oder GPU) - irrelevant, da modell nicht geeignet
+     * - Vorverarbeitung eines Bitmaps (Normalisierung auf [0, 255])
+     * - Durchführung der Inferenz
+     * - Auswertung der Top-3 Ergebnisse
+     * <p>
+     * Unterstützt Uint8-Modelle mit Eingabeform:
+     * [1, imageSize, imageSize, 3]
+     */
 public class Classifier {
 
-    //Labels werden entweder per textdatei bereitgestellt, oder im Fall von bereitgestellten Modellen
+    //Labels werden entweder per textdatei bereitgestellt
     private List<String> labels;
     //vom Modell abhängig
     private int imageSize;
-    private Bitmap selectedBitmap;
-    private MappedByteBuffer modelBuffer;
     private CompiledModel compiledModel;
-    private Environment env;
     private Accelerator accelerator;
 
 
-    // wenn Labels übergeben, nutze File (bei eigenen Modellen);
-    public Classifier(Context context, String modelFile, String labelsFile,int imageSize) throws LiteRtException {
-       try{
-           this.accelerator = Accelerator.CPU;
 
-        compiledModel =
-                CompiledModel.create(
-                        context.getAssets(),
-                        modelFile,
-                        new CompiledModel.Options(accelerator),
-                        null
-                );
+    /**
+     * Konstruktor für CPU-basierte Inferenz.
+     *
+     * @param context     Android Context
+     * @param modelFile   Modell-Datei im Assets-Ordner
+     * @param labelsFile Label-Datei im Assets-Ordner
+     * @param imageSize  Eingabebildgröße des Modells
+     * @throws LiteRtException wenn das Modell nicht geladen werden kann
+     */
+    public Classifier(Context context, String modelFile, String labelsFile, int imageSize) throws LiteRtException {
+        try {
+            this.accelerator = Accelerator.CPU;
 
-        this.imageSize = imageSize;
-        this.labels = loadLabels(context, labelsFile);
-    } catch (LiteRtException e) {
-           Toast.makeText(context, "Fehler beim Laden des Modells: " + e.getMessage(), Toast.LENGTH_LONG).show();
-           e.printStackTrace();
-       }
-       catch (Exception e) {
-           throw new RuntimeException(e);
-       }
+            compiledModel =
+                    CompiledModel.create(
+                            context.getAssets(),
+                            modelFile,
+                            new CompiledModel.Options(accelerator),
+                            null
+                    );
+
+            this.imageSize = imageSize;
+            this.labels = loadLabels(context, labelsFile);
+        } catch (LiteRtException e) {
+            Toast.makeText(context, "Fehler beim Laden des Modells: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            e.printStackTrace();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public Classifier(Context context, String modelFile,String labelsFile , int imageSize, Accelerator newAccelerator) throws LiteRtException {
+    /**
+     * Konstruktor mit wählbarem Accelerator (CPU oder GPU).
+     *
+     * @param context        Android Context
+     * @param modelFile     Modell-Datei im Assets-Ordner
+     * @param labelsFile    Label-Datei im Assets-Ordner
+     * @param imageSize     Eingabebildgröße
+     * @param newAccelerator Gewünschter Accelerator
+     * @throws LiteRtException wenn das Modell nicht geladen werden kann
+     */
+    public Classifier(Context context, String modelFile, String labelsFile, int imageSize, Accelerator newAccelerator) throws LiteRtException {
 
         try {
             this.accelerator = newAccelerator;
@@ -70,7 +97,7 @@ public class Classifier {
 
             this.imageSize = imageSize;
             this.labels = loadLabels(context, labelsFile);
-        } catch (LiteRtException e){
+        } catch (LiteRtException e) {
             Toast.makeText(context, "Fehler beim Laden des Modells: " + e.getMessage(), Toast.LENGTH_LONG).show();
             e.printStackTrace();
         } catch (Exception e) {
@@ -78,12 +105,24 @@ public class Classifier {
         }
     }
 
+    /**
+     * Gibt die Ressourcen des Modells frei.
+     *
+     * @throws LiteRtException bei Fehlern während des Schließens
+     */
     public void close() throws LiteRtException {
         compiledModel.close();
     }
 
-    public void classify(Bitmap bitmap, Consumer<String> callback) throws LiteRtException {
 
+    /**
+     * Führt eine Bildklassifikation auf einem gegebenen Bitmap aus.
+     *
+     * @param bitmap   Eingabebild als {@link Bitmap}
+     * @param callback Callback zur Rückgabe des Ergebnis-Strings
+     * @throws LiteRtException falls die Inferenz fehlschlägt
+     */
+    public void classify(Bitmap bitmap, Consumer<String> callback) throws LiteRtException {
 
 
         List<TensorBuffer> inputBuffers = compiledModel.createInputBuffers();
@@ -94,20 +133,20 @@ public class Classifier {
         byte[] input = new byte[imageSize * imageSize * 3]; // 3 Kanäle: R,G,B
         int[] pixels = new int[imageSize * imageSize];
         scaled.getPixels(
-                pixels,0,imageSize,0,0,imageSize,imageSize);
+                pixels, 0, imageSize, 0, 0, imageSize, imageSize);
 
         for (int i = 0; i < pixels.length; i++) {
             int pixel = pixels[i];
-            input[i * 3]     = (byte)((pixel >> 16) & 0xFF); // R
-            input[i * 3 + 1] = (byte)((pixel >> 8) & 0xFF);  // G
-            input[i * 3 + 2] = (byte)(pixel & 0xFF);         // B
+            input[i * 3] = (byte) ((pixel >> 16) & 0xFF); // R
+            input[i * 3 + 1] = (byte) ((pixel >> 8) & 0xFF);  // G
+            input[i * 3 + 2] = (byte) (pixel & 0xFF);         // B
         }
         inputBuffers.get(0).writeInt8(input);
 
 
         try {
             long startTime = System.nanoTime();
-           compiledModel.run(inputBuffers, outputBuffers); // Inferenz ausführen
+            compiledModel.run(inputBuffers, outputBuffers); // Inferenz ausführen
             long endTime = System.nanoTime();
             long durationMs = (endTime - startTime) / 1_000_000;
             TensorBuffer outputTensor = outputBuffers.get(0);
@@ -127,8 +166,8 @@ public class Classifier {
                     if (p > topProbs[j]) {
                         // Alles nach unten verschieben
                         for (int k = 2; k > j; k--) {
-                            topProbs[k] = topProbs[k-1];
-                            topIndices[k] = topIndices[k-1];
+                            topProbs[k] = topProbs[k - 1];
+                            topIndices[k] = topIndices[k - 1];
                         }
                         topProbs[j] = p;
                         topIndices[j] = i;
@@ -153,6 +192,13 @@ public class Classifier {
         }
     }
 
+    /**
+     * Lädt die Klassennamen aus einer Textdatei im Assets-Ordner.
+     *
+     * @param context  Android Context
+     * @param fileName Name der Label-Datei
+     * @return Liste der Klassenlabels
+     */
     public List<String> loadLabels(Context context, String fileName) {
         List<String> labels = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(
@@ -167,6 +213,13 @@ public class Classifier {
         return labels;
     }
 
+    /**
+     * Prüft, ob das Modell mit GPU-Beschleunigung geladen werden kann.
+     *
+     * @param context   Android Context
+     * @param modelFile Modell-Dateiname
+     * @return {@code true}, wenn GPU unterstützt wird, sonst {@code false}
+     */
     public boolean isGpuSupported(Context context, String modelFile) {
         try {
             CompiledModel gpuTest = CompiledModel.create(context.getAssets(), modelFile, new CompiledModel.Options(Accelerator.GPU));
@@ -177,10 +230,15 @@ public class Classifier {
         }
     }
 
+
+    /**
+     * Gibt den aktuell verwendeten Accelerator zurück.
+     *
+     * @return verwendeter {@link Accelerator}
+     */
     public Accelerator getAccelerator() {
         return accelerator;
     }
-
 
 
 }

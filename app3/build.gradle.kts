@@ -39,9 +39,7 @@ dependencies {
     implementation(libs.activity)
     implementation(libs.constraintlayout)
     implementation(libs.litert)
-
-
-
+    implementation(libs.exifinterface)
 
 
 }

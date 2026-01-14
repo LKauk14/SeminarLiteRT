@@ -14,8 +14,17 @@
         android:id="@+id/imageView"
         android:layout_width="match_parent"
         android:layout_height="300dp"
-        android:scaleType="centerCrop"
-        android:layout_marginTop="16dp"/>
+        android:layout_marginTop="16dp"
+        android:scaleType="centerCrop" />
+
+    <!-- Switch Modus 1 -->
+    <Switch
+        android:id="@+id/switchAccelarator"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="GPU Mode"
+        android:checked="false" />
 
     <Button
         android:id="@+id/buttonClassify"
@@ -28,9 +37,7 @@
         android:id="@+id/textViewResult"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Ergebnis"
         android:layout_marginTop="16dp"
+        android:text="Ergebnis"
         android:textSize="18sp" />
 </LinearLayout>
-
-

@@ -2,6 +2,7 @@ package com.example.app2;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.widget.Toast;
 
 import com.google.ai.edge.litert.Accelerator;
 import com.google.ai.edge.litert.CompiledModel;
@@ -12,8 +13,7 @@ import com.google.ai.edge.litert.*;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+
 import java.nio.MappedByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,23 +29,62 @@ public class Classifier {
     private MappedByteBuffer modelBuffer;
     private CompiledModel compiledModel;
     private Environment env;
+    private Accelerator accelerator;
+
 
     // wenn Labels übergeben, nutze File (bei eigenen Modellen);
     public Classifier(Context context, String modelFile, String labelsFile,int imageSize) throws LiteRtException {
+       try{
+           this.accelerator = Accelerator.CPU;
+
         compiledModel =
                 CompiledModel.create(
                         context.getAssets(),
                         modelFile,
-                        new CompiledModel.Options(Accelerator.CPU),
+                        new CompiledModel.Options(accelerator),
                         null
                 );
 
         this.imageSize = imageSize;
-        this.labels = loadLabels(context, "labels1.txt");
+        this.labels = loadLabels(context, labelsFile);
+    } catch (LiteRtException e) {
+           Toast.makeText(context, "Fehler beim Laden des Modells: " + e.getMessage(), Toast.LENGTH_LONG).show();
+           e.printStackTrace();
+       }
+       catch (Exception e) {
+           throw new RuntimeException(e);
+       }
     }
 
+    public Classifier(Context context, String modelFile,String labelsFile , int imageSize, Accelerator newAccelerator) throws LiteRtException {
+
+        try {
+            this.accelerator = newAccelerator;
+            compiledModel =
+                    CompiledModel.create(
+                            context.getAssets(),
+                            modelFile,
+                            new CompiledModel.Options(accelerator),
+                            null
+                    );
+
+            this.imageSize = imageSize;
+            this.labels = loadLabels(context, labelsFile);
+        } catch (LiteRtException e){
+            Toast.makeText(context, "Fehler beim Laden des Modells: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            e.printStackTrace();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void close() throws LiteRtException {
+        compiledModel.close();
+    }
 
     public void classify(Bitmap bitmap, Consumer<String> callback) throws LiteRtException {
+
+
 
         List<TensorBuffer> inputBuffers = compiledModel.createInputBuffers();
         List<TensorBuffer> outputBuffers = compiledModel.createOutputBuffers();
@@ -67,7 +106,10 @@ public class Classifier {
 
 
         try {
+            long startTime = System.nanoTime();
            compiledModel.run(inputBuffers, outputBuffers); // Inferenz ausführen
+            long endTime = System.nanoTime();
+            long durationMs = (endTime - startTime) / 1_000_000;
             TensorBuffer outputTensor = outputBuffers.get(0);
             byte[] outputBuffer = outputTensor.readInt8();
 
@@ -76,20 +118,35 @@ public class Classifier {
                 probabilities[i] = (outputBuffer[i] & 0xFF) / 255.0f; // Byte → unsigned → float
             }
 
-            int topClass = 0;
-            float topScore = probabilities[0];
+            int[] topIndices = new int[3];
+            float[] topProbs = new float[3];
 
-            for (int i = 1; i < probabilities.length; i++) {
-                if (probabilities[i] > topScore) {
-                    topScore = probabilities[i];
-                    topClass = i;
+            for (int i = 0; i < probabilities.length; i++) {
+                float p = probabilities[i];
+                for (int j = 0; j < 3; j++) {
+                    if (p > topProbs[j]) {
+                        // Alles nach unten verschieben
+                        for (int k = 2; k > j; k--) {
+                            topProbs[k] = topProbs[k-1];
+                            topIndices[k] = topIndices[k-1];
+                        }
+                        topProbs[j] = p;
+                        topIndices[j] = i;
+                        break;
+                    }
                 }
             }
 
 
+            StringBuilder result = new StringBuilder("Top 3:\n");
+            for (int i = 0; i < 3; i++) {
+                result.append(labels.get(topIndices[i]))
+                        .append(String.format(" (%.2f%%)", topProbs[i] * 100))
+                        .append("\n");
+            }
+            result.append("Inferenzzeit: ").append(durationMs).append("ms");
 
-            // Ergebnis zurückgeben
-            callback.accept(labels.get(topClass) + String.format(" (%.2f%%)", topScore * 100));
+            callback.accept(result.toString());
 
         } catch (Exception e) {
             callback.accept("Fehler bei Inference: " + e.getMessage());
@@ -110,51 +167,20 @@ public class Classifier {
         return labels;
     }
 
-  /*  public void classifyWithTensorImage(Bitmap bitmap, Consumer<String> callback) {
-
-        if (interpreter == null) {
-            callback.accept("Interpreter nicht initialisiert");
-            return;
-        }
-
-        // Bild auf Modellgröße skalieren
-        Bitmap scaled = Bitmap.createScaledBitmap(bitmap, imageSize, imageSize, true);
-        ImageProcessor imageProcessor =
-                new ImageProcessor.Builder().add(new ResizeOp(imageSize, imageSize, ResizeOp.ResizeMethod.BILINEAR)).build();
-
-        TensorImage tensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap));
-        ByteBuffer inputBuffer = tensorImage.getBuffer();
-
-        // --- Output ByteBuffer erstellen ---
-        ByteBuffer outputByteBuffer = ByteBuffer.allocateDirect(labels.size()); // float pro Label
-        outputByteBuffer.order(ByteOrder.nativeOrder());
-
+    public boolean isGpuSupported(Context context, String modelFile) {
         try {
-            // Inferenz ausführen
-            interpreter.run(inputBuffer, outputByteBuffer);
-            outputByteBuffer.rewind();
-
-            float[] probs = new float[labels.size()];
-
-            for (int i = 0; i < probs.length; i++) {
-                probs[i] = (outputByteBuffer.get() & 0xFF) / 255f;
-            }
-
-            // Top-1 Label bestimmen
-            int maxIndex = 0;
-            float maxProb = 0;
-            for (int i = 0; i < probs.length; i++) {
-                if (probs[i] > maxProb) {
-                    maxProb = probs[i];
-                    maxIndex = i;
-                }
-            }
-
-            // Ergebnis zurückgeben
-            callback.accept(labels.get(maxIndex) + String.format(" (%.2f%%)", maxProb * 100));
-
+            CompiledModel gpuTest = CompiledModel.create(context.getAssets(), modelFile, new CompiledModel.Options(Accelerator.GPU));
+            gpuTest.close(); // danach wieder schließen
+            return true; // GPU möglich
         } catch (Exception e) {
-            callback.accept("Fehler bei Inference: " + e.getMessage());
+            return false; // GPU nicht möglich
         }
-    }*/
+    }
+
+    public Accelerator getAccelerator() {
+        return accelerator;
+    }
+
+
+
 }

@@ -61,6 +61,7 @@ public class Classifier {
         }
     }
 
+
     private void initInterpreter(Context context, String modelFile) {
         try {
             this.modelBuffer = FileUtil.loadMappedFile(context, modelFile);

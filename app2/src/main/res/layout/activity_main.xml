@@ -2,43 +2,46 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="24dp"
     android:fitsSystemWindows="true">
 
     <Button
         android:id="@+id/buttonUpload"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Bild laden" />
+        android:text="Bild laden"
+        android:textSize="22sp" />
 
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="match_parent"
         android:layout_height="300dp"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="20dp"
         android:scaleType="centerCrop" />
 
-    <!-- Switch Modus 1 -->
     <Switch
         android:id="@+id/switchAccelarator"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="20dp"
         android:text="GPU Mode"
+        android:textSize="22sp"
         android:checked="false" />
 
     <Button
         android:id="@+id/buttonClassify"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Klassifizieren" />
+        android:layout_marginTop="20dp"
+        android:text="Klassifizieren"
+        android:textSize="22sp" />
 
     <TextView
         android:id="@+id/textViewResult"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="24dp"
         android:text="Ergebnis"
-        android:textSize="18sp" />
+        android:textSize="28sp"
+        android:textStyle="bold" />
 </LinearLayout>
